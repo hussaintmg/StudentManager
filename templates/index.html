@@ -9,6 +9,21 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
+    <!-- Custom Confirmation Modal -->
+    <div class="modal-overlay" id="delete-modal">
+        <div class="modal">
+            <div class="modal-icon">
+                <i data-lucide="alert-triangle"></i>
+            </div>
+            <h3>Confirm Deletion</h3>
+            <p>Are you sure you want to remove this record? This action cannot be undone.</p>
+            <div class="modal-actions">
+                <button class="btn-modal btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+                <button class="btn-modal btn-confirm" id="confirm-delete-btn">Delete Now</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container animate-in">
         <header>
             <h1>Student Manager</h1>
@@ -111,8 +126,12 @@
         const btnText = document.getElementById('btn-text');
         const cancelBtn = document.getElementById('cancel-btn');
         const formTitle = document.getElementById('form-title');
+        
+        const deleteModal = document.getElementById('delete-modal');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
 
         let isEditing = false;
+        let studentToDelete = null;
 
         async function refreshRecords() {
             try {
@@ -140,7 +159,7 @@
                             <button class="btn-circle btn-edit-active" onclick="prepareEdit('${s._id}', '${s.name}', '${s.email}', ${s.age}, '${s.course}', '${s.grade}')">
                                 <i data-lucide="pencil" style="width: 14px;"></i>
                             </button>
-                            <button class="btn-circle btn-delete-active" onclick="discardStudent('${s._id}')">
+                            <button class="btn-circle btn-delete-active" onclick="openDeleteModal('${s._id}')">
                                 <i data-lucide="trash-2" style="width: 14px;"></i>
                             </button>
                         </div>
@@ -206,10 +225,31 @@
             lucide.createIcons();
         };
 
-        window.discardStudent = async (id) => {
-            if (!confirm('Permanently remove this student?')) return;
-            await fetch(`${api}/${id}`, { method: 'DELETE' });
-            refreshRecords();
+        // Modal Logic
+        window.openDeleteModal = (id) => {
+            studentToDelete = id;
+            deleteModal.style.display = 'flex';
+        };
+
+        window.closeDeleteModal = () => {
+            deleteModal.style.display = 'none';
+            studentToDelete = null;
+        };
+
+        confirmDeleteBtn.onclick = async () => {
+            if (!studentToDelete) return;
+            
+            confirmDeleteBtn.innerText = 'Deleting...';
+            confirmDeleteBtn.disabled = true;
+
+            try {
+                await fetch(`${api}/${studentToDelete}`, { method: 'DELETE' });
+                refreshRecords();
+            } finally {
+                confirmDeleteBtn.innerText = 'Delete Now';
+                confirmDeleteBtn.disabled = false;
+                closeDeleteModal();
+            }
         };
 
         function resetEditState() {
