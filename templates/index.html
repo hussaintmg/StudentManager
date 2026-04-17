@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudentManager | Registry</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="container animate-in">
+        <header>
+            <h1>Student Manager</h1>
+            <p style="color: var(--text-muted); font-weight: 500;">Academic Data Management Console</p>
+        </header>
+
+        <div class="stats-row">
+            <div class="stat-item">
+                <i data-lucide="users" style="color: var(--primary)"></i>
+                <div class="stat-info">
+                    <div class="label">Total Students</div>
+                    <div class="value" id="total-students">0</div>
+                </div>
+            </div>
+            <div class="stat-item">
+                <i data-lucide="server" style="color: var(--secondary)"></i>
+                <div class="stat-info">
+                    <div class="label">Database</div>
+                    <div class="value">MongoDB</div>
+                </div>
+            </div>
+            <div class="stat-item">
+                <i data-lucide="activity" style="color: #f59e0b"></i>
+                <div class="stat-info">
+                    <div class="label">Status</div>
+                    <div class="value" style="color: var(--secondary); font-size: 0.9rem;">Live Sync</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="app-grid">
+            <!-- Action Panel -->
+            <div class="panel animate-in" style="animation-delay: 0.1s;">
+                <h2 class="section-title" id="form-title">
+                    <i data-lucide="user-plus" style="width: 18px"></i> Enroll Student
+                </h2>
+                <form id="student-form">
+                    <input type="hidden" id="student-id">
+                    <div class="input-group">
+                        <label>Full Name</label>
+                        <input type="text" id="name" placeholder="Student name" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Email Address</label>
+                        <input type="email" id="email" placeholder="email@uni.edu" required>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                        <div class="input-group">
+                            <label>Age</label>
+                            <input type="number" id="age" value="18" required>
+                        </div>
+                        <div class="input-group">
+                            <label>Grade</label>
+                            <select id="grade">
+                                <option value="A+">A+</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Course</label>
+                        <input type="text" id="course" placeholder="e.g. CS101" required>
+                    </div>
+                    <button type="submit" class="btn-action" id="submit-btn">
+                        <span id="btn-text">Submit Record</span>
+                    </button>
+                    <button type="button" class="btn-action" style="background: #27272a; margin-top: 0.5rem; display: none;" id="cancel-btn">Cancel Edit</button>
+                </form>
+            </div>
+
+            <!-- Repository Panel -->
+            <div class="panel animate-in" style="animation-delay: 0.2s;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2 class="section-title" style="margin-bottom: 0;">
+                        <i data-lucide="database" style="width: 18px"></i> Registry Core
+                    </h2>
+                    <span id="refresh-btn" style="cursor: pointer; opacity: 0.6;"><i data-lucide="rotate-cw" style="width: 16px;"></i></span>
+                </div>
+                
+                <div id="student-list">
+                    <!-- Loading state -->
+                    <div style="text-align: center; color: var(--text-muted); padding: 2rem; font-size: 0.9rem;">
+                        Synchronizing with MongoDB...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        
+        const api = '/api/students';
+        const listEl = document.getElementById('student-list');
+        const form = document.getElementById('student-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const btnText = document.getElementById('btn-text');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const formTitle = document.getElementById('form-title');
+
+        let isEditing = false;
+
+        async function refreshRecords() {
+            try {
+                const res = await fetch(api);
+                const data = await res.json();
+                
+                document.getElementById('total-students').innerText = data.length;
+                
+                if (data.length === 0) {
+                    listEl.innerHTML = `<div style="text-align: center; color: var(--text-muted); border: 1px dashed var(--border); padding: 2rem; border-radius: 12px; font-size: 0.85rem;">No active records found.</div>`;
+                    return;
+                }
+
+                listEl.innerHTML = data.map((s, index) => `
+                    <div class="student-card animate-in" style="animation-delay: ${index * 0.05}s">
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.95rem;">${s.name}</div>
+                            <div style="color: var(--text-muted); font-size: 0.8rem;">${s.email}</div>
+                            <div class="student-meta">
+                                <span class="chip chip-course">${s.course}</span>
+                                <span class="chip chip-grade">${s.grade}</span>
+                            </div>
+                        </div>
+                        <div class="op-btns">
+                            <button class="btn-circle btn-edit-active" onclick="prepareEdit('${s._id}', '${s.name}', '${s.email}', ${s.age}, '${s.course}', '${s.grade}')">
+                                <i data-lucide="pencil" style="width: 14px;"></i>
+                            </button>
+                            <button class="btn-circle btn-delete-active" onclick="discardStudent('${s._id}')">
+                                <i data-lucide="trash-2" style="width: 14px;"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                lucide.createIcons();
+            } catch (err) {
+                listEl.innerHTML = `<div style="color: var(--danger); font-size: 0.85rem;">Failed to fetch database records.</div>`;
+            }
+        }
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('student-id').value;
+            const payload = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                age: parseInt(document.getElementById('age').value),
+                course: document.getElementById('course').value,
+                grade: document.getElementById('grade').value,
+            };
+
+            btnText.innerText = 'Processing...';
+            submitBtn.disabled = true;
+
+            const url = isEditing ? `${api}/${id}` : api;
+            const method = isEditing ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (res.ok) {
+                    form.reset();
+                    resetEditState();
+                    refreshRecords();
+                }
+            } catch (err) {
+                alert('Database communication error');
+            } finally {
+                btnText.innerText = isEditing ? 'Update Record' : 'Submit Record';
+                submitBtn.disabled = false;
+            }
+        };
+
+        window.prepareEdit = (id, name, email, age, course, grade) => {
+            isEditing = true;
+            document.getElementById('student-id').value = id;
+            document.getElementById('name').value = name;
+            document.getElementById('email').value = email;
+            document.getElementById('age').value = age;
+            document.getElementById('course').value = course;
+            document.getElementById('grade').value = grade;
+
+            formTitle.innerHTML = `<i data-lucide="edit-3" style="width: 18px"></i> Update Record`;
+            btnText.innerText = 'Update Record';
+            cancelBtn.style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            lucide.createIcons();
+        };
+
+        window.discardStudent = async (id) => {
+            if (!confirm('Permanently remove this student?')) return;
+            await fetch(`${api}/${id}`, { method: 'DELETE' });
+            refreshRecords();
+        };
+
+        function resetEditState() {
+            isEditing = false;
+            formTitle.innerHTML = `<i data-lucide="user-plus" style="width: 18px"></i> Enroll Student`;
+            btnText.innerText = 'Submit Record';
+            cancelBtn.style.display = 'none';
+        }
+
+        cancelBtn.onclick = () => {
+            form.reset();
+            resetEditState();
+        };
+
+        document.getElementById('refresh-btn').onclick = () => {
+            refreshRecords();
+        };
+
+        refreshRecords();
+    </script>
+</body>
+</html>
